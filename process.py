@@ -10,7 +10,7 @@ from pytorch_transformers import BertTokenizer
 class Dataset(data.Dataset):
     """据集类"""
 
-    def __init__(self, tagged_sents, language='en'):
+    def __init__(self, tagged_sents, tag_to_index, config, word_to_embid=None):
         """
         初始化
         :param tagged_sents: 标记句子
@@ -23,14 +23,10 @@ class Dataset(data.Dataset):
             tags.append(["<pad>"] + tag + ["<pad>"])
 
         self.sents, self.tags = sents, tags
-        self.language = language
 
-        if language == 'en':
-            self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        else:
-            self.tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
 
-        self.tag_to_index = {'0': 0, '1': 1, '2': 2, 'NA': 3, '<pad>': 3}
+        self.tag_to_index = tag_to_index
 
     def __len__(self):
         return len(self.sents)
@@ -156,7 +152,30 @@ def load_chinese_dataset():
     print('Dev sentences: {}'.format(len(splits["dev"])))
     print('Test sentences: {}'.format(len(splits["test"])))
 
-    return splits
+    tag_to_index = {'0': 0, '1': 1, '2': 2, 'NA': 3, '<pad>': 3}
+    index_to_tag = {0: '0', 1: '1', 2: '2', 3: 'NA', 4: '<pad>'}
+
+    return splits, tag_to_index, index_to_tag
+
+
+def pad(batch):
+    """
+    :param batch:
+    :return:
+    """
+    # Pad sentences to the longest sample
+    f = lambda x: [sample[x] for sample in batch]
+    sents = f(0)
+    tags = f(1)
+    seqlens = f(4)
+    maxlen = np.array(seqlens).max()
+
+    f = lambda x, seqlen: [sample[x] + [0] * (seqlen - len(sample[x])) for sample in batch]  # 0: <pad>
+    x = f(2, maxlen)
+    y = f(3, maxlen)
+
+    f = torch.LongTensor
+    return sents, tags, f(x), f(y), seqlens
 
 
 # dataset_english = load_english_dataset()
